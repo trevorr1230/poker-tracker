@@ -15,7 +15,81 @@
         .button-group button { padding: 8px 12px; background: #ddd; border-radius: 4px; }
         .active { background: #4CAF50 !important; color: white; }
         .hand-number { font-size: 1.2em; margin: 10px 0; }
-        .bb-display { background: #fff; padding: 5px 10px; border-radius: 4px; }
+        .bb-display { background: #fff; padding: 5px 10px; border-radius:<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poker Action Tracker</title>
+    <style>
+        /* Base Styles */
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .container { 
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            flex: 1;
+            padding: 20px;
+        }
+
+        .input-section {
+            order: 1;
+        }
+
+        .log {
+            order: 2;
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            height: 50vh;
+            overflow-y: auto;
+        }
+
+        /* Mobile Layout */
+        @media (min-width: 768px) {
+            .container {
+                grid-template-columns: 1fr 1fr;
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+            .log {
+                height: auto;
+                order: initial;
+            }
+        }
+
+        /* Common Styles */
+        .button-group { 
+            display: flex; 
+            gap: 5px; 
+            flex-wrap: wrap; 
+            margin: 10px 0; 
+        }
+        button { 
+            background: #4CAF50; 
+            color: white; 
+            padding: 8px 12px; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 4px; 
+        }
+        .active { background: #388E3C; }
+        .danger-button { background: #ff4444; }
+        .hand-number { 
+            font-size: 1.2em; 
+            margin: 10px 0; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
