@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poker Action Tracker</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .log { background: #f5f5f5; padding: 15px; border-radius: 5px; }
+        button { background: #4CAF50; color: white; padding: 10px; border: none; cursor: pointer; }
+        .timestamp { color: #666; font-size: 0.8em; }
+        .danger-button { background: #ff4444; }
+        .button-group { display: flex; gap: 5px; flex-wrap: wrap; margin: 10px 0; }
+        .button-group button { padding: 8px 12px; background: #ddd; border-radius: 4px; }
+        .active { background: #4CAF50 !important; color: white; }
+        .hand-number { font-size: 1.2em; margin: 10px 0; }
+        .bb-display { background: #fff; padding: 5px 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Poker Action Tracker</h1>
+    
+    <div class="container">
+        <div class="input-section">
+            <div class="hand-number">
+                <span id="currentHand">Hand #1</span>
+                <button onclick="newHand()">New Hand</button>
+            </div>
+
+            <!-- Street Selection -->
+            <div class="button-group">
+                <button class="active" onclick="selectStreet('pre-flop')">Pre-Flop</button>
+                <button onclick="selectStreet('flop')">Flop</button>
+                <button onclick="selectStreet('turn')">Turn</button>
+                <button onclick="selectStreet('river')">River</button>
+            </div>
+
+            <!-- Position Selection -->
+            <div class="button-group" id="positionButtons"></div>
+
+            <!-- Action Selection -->
+            <div class="button-group">
+                <button onclick="selectAction('Bet')">Bet</button>
+                <button onclick="selectAction('Raise')">Raise</button>
+                <button onclick="selectAction('Call')">Call</button>
+                <button onclick="selectAction('Check')">Check</button>
+                <button onclick="selectAction('Fold')">Fold</button>
+                <button onclick="selectAction('All-In')">All-In</button>
+            </div>
+
+            <!-- Bet Sizing (BB) -->
+            <div class="button-group" id="betSizing">
+                <button onclick="setBetSize(1)">1BB</button>
+                <button onclick="setBetSize(2)">2BB</button>
+                <button onclick="setBetSize(3)">3BB</button>
+                <button onclick="setBetSize(4)">4BB</button>
+                <button onclick="setBetSize(5)">5BB</button>
+                <button onclick="setBetSize('C')">C-bet</button>
+            </div>
+
+            <button onclick="logAction()">Record Action</button>
+        </div>
+
+        <div class="log">
+            <h2>Action Log 
+                <button onclick="exportCSV()">Export CSV</button>
+                <button class="danger-button" onclick="clearLog()">Clear</button>
+            </h2>
+            <div id="actionLog"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentHand = 1;
+        let actions = [];
+        let currentStreet = 'pre-flop';
+        let currentPosition = '';
+        let currentAction = '';
+        let currentBetSize = 0;
+        const BB_VALUE = 2; // Default big blind value
+
+        const positions = {
+            preFlop: ['UTG', 'UTG+1', 'UTG+2', 'MP', 'MP+1', 'HJ', 'CO', 'BTN', 'SB', 'BB'],
+            postFlop: ['SB', 'BB', 'UTG', 'UTG+1', 'UTG+2', 'MP', 'MP+1', 'HJ', 'CO', 'BTN']
+        };
+
+        function updateHandDisplay() {
+            document.getElementById('currentHand').textContent = `Hand #${currentHand}`;
+        }
+
+        function selectStreet(street) {
+            currentStreet = street;
+            document.querySelectorAll('.button-group button').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === street.toLowerCase());
+            });
+            updatePositions();
+        }
+
+        function updatePositions() {
+            const posList = currentStreet === 'pre-flop' ? positions.preFlop : positions.postFlop;
+            const positionButtons = document.getElementById('positionButtons');
+            positionButtons.innerHTML = posList.map(pos => 
+                `<button onclick="selectPosition('${pos}')">${pos}</button>`
+            ).join('');
+        }
+
+        function selectPosition(position) {
+            currentPosition = position;
+            document.querySelectorAll('#positionButtons button').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === position);
+            });
+        }
+
+        function selectAction(action) {
+            currentAction = action;
+            document.querySelectorAll('.button-group button').forEach(btn => {
+                if(btn.parentElement.id !== 'betSizing') {
+                    btn.classList.toggle('active', btn.textContent === action);
+                }
+            });
+        }
+
+        function setBetSize(size) {
+            currentBetSize = size === 'C' ? 2.5 * BB_VALUE : size * BB_VALUE;
+            document.querySelectorAll('#betSizing button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        function logAction() {
+            const action = {
+                hand: currentHand,
+                street: currentStreet,
+                timestamp: new Date().toISOString(),
+                position: currentPosition,
+                action: currentAction,
+                amount: currentBetSize,
+                bb: BB_VALUE
+            };
+            
+            actions.push(action);
+            updateLog();
+            resetSelections();
+        }
+
+        function newHand() {
+            currentHand++;
+            updateHandDisplay();
+            resetSelections();
+        }
+
+        function resetSelections() {
+            currentStreet = 'pre-flop';
+            currentPosition = '';
+            currentAction = '';
+            currentBetSize = 0;
+            document.querySelectorAll('.active').forEach(btn => btn.classList.remove('active'));
+            document.querySelector('.button-group button:first-child').classList.add('active');
+            updatePositions();
+        }
+
+        function updateLog() {
+            const logDiv = document.getElementById('actionLog');
+            logDiv.innerHTML = actions.slice(-10).reverse().map(action => 
+                `<div class="log-entry">
+                    <span class="timestamp">[${new Date(action.timestamp).toLocaleTimeString()}]</span>
+                    Hand #${action.hand} (${action.street}) - ${action.position}: 
+                    ${action.action} ${action.amount ? `${action.amount}BB ($${action.amount * BB_VALUE})` : ''}
+                </div>`
+            ).join('');
+        }
+
+        function exportCSV() {
+            const csvContent = "data:text/csv;charset=utf-8," +
+                "Hand,Street,Timestamp,Position,Action,Amount(BB),Amount($)\n" +
+                actions.map(action => 
+                    `${action.hand},${action.street},${action.timestamp},` +
+                    `${action.position},${action.action},` +
+                    `${action.amount},$${action.amount * action.bb}`
+                ).join("\n");
+            
+            const link = document.createElement("a");
+            link.href = encodeURI(csvContent);
+            link.download = "poker_session.csv";
+            link.click();
+        }
+
+        function clearLog() {
+            if(confirm("Clear all logged actions?")) {
+                actions = [];
+                updateLog();
+            }
+        }
+
+        // Initial setup
+        updatePositions();
+        updateHandDisplay();
+    </script>
+</body>
+</html>
