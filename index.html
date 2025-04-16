@@ -22,7 +22,7 @@
         .log {
             background: white;
             padding: 15px;
-            border-radius: 5px;
+            border-radius: 5x;
             height: 50vh;
             overflow-y: auto;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -89,14 +89,41 @@
             color: white;
         }
 
+        .street-cards {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f0f8ff;
+            border-radius: 5px;
+        }
+
+        .hand-section {
+            margin: 10px 0;
+            padding: 10px;
+            background: #fff3cd;
+            border-radius: 5px;
+        }
+
         @media (min-width: 768px) {
             .container {
                 grid-template-columns: 1fr 1fr;
             }
-            .card-btn {
-                padding: 10px;
-                min-width: 50px;
-            }
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+            word-wrap: break-word;
+        }
+        
+        th {
+            background: #f8f9fa;
         }
     </style>
 </head>
@@ -110,7 +137,6 @@
                 <button onclick="newHand()">New Hand</button>
             </div>
 
-            <!-- 1. Street Selection -->
             <div class="group-label">STREET SELECTION</div>
             <div class="button-group">
                 <button class="active" onclick="selectStreet('pre-flop')">Pre-Flop</button>
@@ -119,9 +145,8 @@
                 <button onclick="selectStreet('river')">River</button>
             </div>
 
-            <!-- 2. Position (3 UTG, 2 MP) -->
             <div class="group-label">POSITION</div>
-            <div class="button-group">
+            <div class="button-group" id="positionButtons">
                 <button onclick="selectPosition('UTG')">UTG</button>
                 <button onclick="selectPosition('UTG+1')">UTG+1</button>
                 <button onclick="selectPosition('UTG+2')">UTG+2</button>
@@ -134,9 +159,8 @@
                 <button onclick="selectPosition('BB')">BB</button>
             </div>
 
-            <!-- 3. Action -->
             <div class="group-label">ACTION</div>
-            <div class="button-group">
+            <div class="button-group" id="actionButtons">
                 <button onclick="selectAction('Bet')">Bet</button>
                 <button onclick="selectAction('Raise')">Raise</button>
                 <button onclick="selectAction('Call')">Call</button>
@@ -145,9 +169,8 @@
                 <button onclick="selectAction('All-In')">All-In</button>
             </div>
 
-            <!-- 4. Bet Size -->
             <div class="group-label">BET SIZE (BB)</div>
-            <div class="button-group">
+            <div class="button-group" id="betSizing">
                 <button onclick="setBetSize(1)">1BB</button>
                 <button onclick="setBetSize(2)">2BB</button>
                 <button onclick="setBetSize(3)">3BB</button>
@@ -156,8 +179,12 @@
                 <button onclick="setBetSize('C')">C-bet</button>
             </div>
 
-            <!-- 5. Community Cards -->
             <div class="group-label">COMMUNITY CARDS</div>
+            <div class="street-cards">
+                <div>Flop: <span id="flopCards"></span></div>
+                <div>Turn: <span id="turnCard"></span></div>
+                <div>River: <span id="riverCard"></span></div>
+            </div>
             <div class="card-row" id="rankButtons">
                 <button>A</button><button>2</button><button>3</button><button>4</button>
                 <button>5</button><button>6</button><button>7</button><button>8</button>
@@ -166,12 +193,18 @@
             <div class="card-row" id="suitButtons">
                 <button>♠</button><button>♥</button><button>♦</button><button>♣</button>
             </div>
-            <div id="communityDisplay" style="margin: 10px 0"></div>
 
-            <!-- 6. Player & Opponent Hands -->
             <div class="group-label">HANDS</div>
-            <div>Your Hand: <span id="playerHandDisplay"></span></div>
-            <div>Opponent Hand: <span id="opponentHandDisplay"></span></div>
+            <div class="hand-section">
+                <div class="button-group">
+                    <button onclick="selectHandTarget('player')" id="playerHandBtn">Select Your Hand</button>
+                    <button onclick="selectHandTarget('opponent')" id="opponentHandBtn">Select Opponent Hand</button>
+                </div>
+                <div style="margin-top: 10px;">
+                    <div>Your Hand: <span id="playerHandDisplay"></span></div>
+                    <div>Opponent Hand: <span id="opponentHandDisplay"></span></div>
+                </div>
+            </div>
             
             <button onclick="logAction()" style="margin-top: 20px;">Record Action</button>
         </div>
@@ -180,6 +213,7 @@
             <h2>Action Log 
                 <button onclick="exportCSV()">Export CSV</button>
                 <button class="danger-button" onclick="clearLog()">Clear Log</button>
+                <button onclick="undoLastAction()">Undo Last Action</button>
             </h2>
             <div id="actionLog"></div>
         </div>
@@ -193,15 +227,15 @@ let currentState = {
     position: '',
     action: '',
     betSize: 0,
-    communityCards: [],
+    communityCards: { flop: [], turn: '', river: '' },
     playerHand: [],
     opponentHand: [],
     selectedRank: null,
     selectedSuit: null,
-    handTarget: 'community' // community/player/opponent
+    handTarget: null
 };
 
-// Card selection handling
+// Card Selection
 document.querySelectorAll('#rankButtons button').forEach(btn => {
     btn.addEventListener('click', () => handleCardSelect('rank', btn.textContent));
 });
@@ -216,57 +250,78 @@ function handleCardSelect(type, value) {
     } else {
         currentState.selectedSuit = currentState.selectedSuit === value ? null : value;
     }
+
+    document.querySelectorAll('#rankButtons button, #suitButtons button').forEach(btn => {
+        btn.classList.remove('selected');
+    });
     
+    if(currentState.selectedRank) {
+        document.querySelectorAll('#rankButtons button').forEach(btn => {
+            if(btn.textContent === currentState.selectedRank) btn.classList.add('selected');
+        });
+    }
+    if(currentState.selectedSuit) {
+        document.querySelectorAll('#suitButtons button').forEach(btn => {
+            if(btn.textContent === currentState.selectedSuit) btn.classList.add('selected');
+        });
+    }
+
     if(currentState.selectedRank && currentState.selectedSuit) {
         const card = currentState.selectedRank + currentState.selectedSuit;
-        if(currentState.handTarget === 'community') {
-            addCommunityCard(card);
-        } else {
+        if(currentState.handTarget) {
             addHandCard(card);
+        } else {
+            addCommunityCard(card);
         }
         currentState.selectedRank = null;
         currentState.selectedSuit = null;
+        document.querySelectorAll('#rankButtons button, #suitButtons button').forEach(btn => {
+            btn.classList.remove('selected');
+        });
     }
-    updateCardButtons();
 }
 
 function addCommunityCard(card) {
-    const maxCards = {
-        'pre-flop': 0,
-        'flop': 3,
-        'turn': 1,
-        'river': 1
-    }[currentState.street];
-    
-    if(currentState.communityCards.length < maxCards) {
-        currentState.communityCards.push(card);
-        updateCommunityDisplay();
+    const street = currentState.street;
+    if(street === 'pre-flop') {
+        alert("Switch to Flop/Turn/River first!");
+        return;
     }
+    
+    if(street === 'flop' && currentState.communityCards.flop.length < 3) {
+        currentState.communityCards.flop.push(card);
+    } else if(street === 'turn' && !currentState.communityCards.turn) {
+        currentState.communityCards.turn = card;
+    } else if(street === 'river' && !currentState.communityCards.river) {
+        currentState.communityCards.river = card;
+    }
+    updateCommunityDisplay();
+}
+
+function updateCommunityDisplay() {
+    document.getElementById('flopCards').textContent = currentState.communityCards.flop.join(' ');
+    document.getElementById('turnCard').textContent = currentState.communityCards.turn;
+    document.getElementById('riverCard').textContent = currentState.communityCards.river;
 }
 
 function addHandCard(card) {
     const target = currentState.handTarget;
-    if(currentState[target + 'Hand'].length < 2) {
-        currentState[target + 'Hand'].push(card);
+    const hand = currentState[target + 'Hand'];
+    if(hand.length < 2 && !hand.includes(card)) {
+        hand.push(card);
         updateHandDisplays();
     }
 }
 
-function updateCardButtons() {
-    document.querySelectorAll('#rankButtons button').forEach(btn => {
-        btn.classList.toggle('selected', btn.textContent === currentState.selectedRank);
-    });
-    document.querySelectorAll('#suitButtons button').forEach(btn => {
-        btn.classList.toggle('selected', btn.textContent === currentState.selectedSuit);
-    });
+function updateHandDisplays() {
+    document.getElementById('playerHandDisplay').textContent = currentState.playerHand.join(' ');
+    document.getElementById('opponentHandDisplay').textContent = currentState.opponentHand.join(' ');
 }
 
-// Game actions
 function selectStreet(street) {
     currentState.street = street;
     document.querySelectorAll('[onclick^="selectStreet"]').forEach(btn => 
         btn.classList.toggle('active', btn.textContent.toLowerCase() === street));
-    clearCommunityCards();
 }
 
 function selectPosition(position) {
@@ -287,21 +342,20 @@ function setBetSize(size) {
         btn.classList.toggle('active', btn.textContent === `${size}${size === 'C' ? '-bet' : 'BB'}`));
 }
 
-function clearCommunityCards() {
-    currentState.communityCards = [];
-    updateCommunityDisplay();
+function selectHandTarget(target) {
+    currentState.handTarget = target;
+    document.querySelectorAll('#playerHandBtn, #opponentHandBtn').forEach(btn => 
+        btn.classList.remove('active'));
+    document.getElementById(target + 'HandBtn').classList.add('active');
 }
 
-function updateCommunityDisplay() {
-    document.getElementById('communityDisplay').textContent = 
-        currentState.communityCards.join(' ');
-}
-
-function updateHandDisplays() {
-    document.getElementById('playerHandDisplay').textContent = 
-        currentState.playerHand.join(' ');
-    document.getElementById('opponentHandDisplay').textContent = 
-        currentState.opponentHand.join(' ');
+function resetSelections() {
+    currentState.position = '';
+    currentState.action = '';
+    currentState.betSize = 0;
+    
+    document.querySelectorAll('.button-group button').forEach(btn => 
+        btn.classList.remove('active'));
 }
 
 function newHand() {
@@ -311,51 +365,90 @@ function newHand() {
         position: '',
         action: '',
         betSize: 0,
-        communityCards: [],
+        communityCards: { flop: [], turn: '', river: '' },
         playerHand: [],
         opponentHand: [],
         selectedRank: null,
         selectedSuit: null,
-        handTarget: 'community'
+        handTarget: null
     };
-    document.querySelectorAll('.active, .selected').forEach(el => 
-        el.classList.remove('active', 'selected'));
+    document.querySelectorAll('.active').forEach(el => el.classList.remove('active'));
     document.querySelector('[onclick="selectStreet(\'pre-flop\')"]').classList.add('active');
+    document.getElementById('currentHand').textContent = `Hand #${currentHand}`;
     updateCommunityDisplay();
     updateHandDisplays();
-    document.getElementById('currentHand').textContent = `Hand #${currentHand}`;
+    document.querySelectorAll('#rankButtons button, #suitButtons button').forEach(btn => {
+        btn.classList.remove('selected');
+    });
+    resetSelections();
+    updateLog();
 }
 
 function logAction() {
+    if(!currentState.position || !currentState.action) {
+        alert("Please select position and action!");
+        return;
+    }
+    
     const actionEntry = {
         ...currentState,
         handNumber: currentHand,
         timestamp: new Date().toISOString()
     };
     actions.push(actionEntry);
+    
+    resetSelections();
     updateLog();
 }
 
 function updateLog() {
     const logDiv = document.getElementById('actionLog');
-    logDiv.innerHTML = actions.slice().reverse().map(action => `
-        <div style="margin-bottom: 15px;">
-            <strong>Hand #${action.handNumber}</strong> (${action.street})<br>
-            Position: ${action.position}<br>
-            Action: ${action.action} ${action.betSize ? `${action.betSize}BB` : ''}<br>
-            Community: ${action.communityCards.join(' ')}<br>
-            Your Hand: ${action.playerHand.join(' ')}<br>
-            Opponent: ${action.opponentHand.join(' ')}
-        </div>
-    `).join('');
+    logDiv.innerHTML = `
+        <table>
+            <tr>
+                <th>Position</th>
+                <th>Pre-Flop</th>
+                <th>Flop</th>
+                <th>Turn</th>
+                <th>River</th>
+            </tr>
+            ${generateTableRows()}
+        </table>
+    `;
+}
+
+function generateTableRows() {
+    const currentHandActions = actions.filter(a => a.handNumber === currentHand);
+    const positions = [...new Set(currentHandActions.map(a => a.position))];
+    
+    return positions.map(pos => `
+        <tr>
+            <td>${pos}</td>
+            ${['pre-flop', 'flop', 'turn', 'river'].map(street => `
+                <td>
+                    ${getStreetActions(pos, street)}
+                </td>
+            `).join('')}
+        </tr>`
+    ).join('');
+}
+
+function getStreetActions(position, street) {
+    return actions
+        .filter(a => a.handNumber === currentHand && 
+                    a.position === position && 
+                    a.street === street)
+        .map(a => `${a.action}${a.betSize ? ` (${a.betSize}${typeof a.betSize === 'number' ? 'BB' : ''})` : ''}`)
+        .join('<br>') || '-';
 }
 
 function exportCSV() {
     const csvContent = "data:text/csv;charset=utf-8," +
-        "Hand,Street,Position,Action,BetSize,CommunityCards,PlayerHand,OpponentHand,Timestamp\n" +
+        "Hand,Street,Position,Action,BetSize,Flop,Turn,River,PlayerHand,OpponentHand,Timestamp\n" +
         actions.map(a => 
             `${a.handNumber},${a.street},${a.position},${a.action},${a.betSize},` +
-            `"${a.communityCards.join(' ')}","${a.playerHand.join(' ')}",` +
+            `"${a.communityCards.flop.join(' ')}","${a.communityCards.turn}",` +
+            `"${a.communityCards.river}","${a.playerHand.join(' ')}",` +
             `"${a.opponentHand.join(' ')}",${a.timestamp}`
         ).join("\n");
 
@@ -372,7 +465,13 @@ function clearLog() {
     }
 }
 
-// Initialize
+function undoLastAction() {
+    if (actions.length > 0) {
+        actions.pop();
+        updateLog();
+    }
+}
+
 document.querySelector('[onclick="selectStreet(\'pre-flop\')"]').classList.add('active');
 </script>
 </body>
